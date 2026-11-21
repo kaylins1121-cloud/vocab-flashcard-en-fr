@@ -10,6 +10,8 @@
 - Đánh giá mức nhớ Khó / Tạm / Dễ để tự động lên lịch ôn lại.
 - Lọc nhanh: Tất cả / Chỉ Tiếng Anh / Chỉ Tiếng Pháp.
 - Thêm thẻ mới ngay trong ứng dụng và lưu vào `localStorage`.
+- **Tab “Gốc từ & Ghép từ”**: tra cứu 18 gốc từ, tiền tố, hậu tố thông dụng của Tiếng Anh và Tiếng Pháp, có công thức ghép từ, từ phái sinh, nghe phát âm và thanh tìm kiếm theo thời gian thực.
+- Từ trong flashcard có chứa gốc từ sẽ hiện nút “🌱 Xem gốc từ” để nhảy thẳng tới cách ghép từ đó.
 
 ## Cách 1: Mở file `lexi.html` (không cần cài gì)
 
@@ -39,20 +41,24 @@ npm run build     # kiểm tra kiểu và build ra thư mục dist/
 npm run preview   # chạy thử bản build
 ```
 
-Để tạo lại bản một file duy nhất, cài thêm `vite-plugin-singlefile` rồi thêm `viteSingleFile()` vào `plugins` trong `vite.config.ts`. Sau `npm run build`, file `dist/index.html` chính là bản chạy độc lập.
+Dự án đã cấu hình sẵn `vite-plugin-singlefile`: sau `npm run build`, file `dist/index.html` là bản chạy độc lập, bấm đúp là mở được.
 
 ## Cấu trúc thư mục
 
 ```
 src/
 ├─ main.tsx, index.css, App.tsx, types.ts
-├─ data/cards.json        # dữ liệu thẻ gốc
+├─ data/
+│  ├─ cards.json          # dữ liệu thẻ flashcard
+│  └─ wordRoots.json      # dữ liệu gốc từ, tiền tố, hậu tố
 ├─ lib/
 │  ├─ srs.ts              # thuật toán ôn tập ngắt quãng
+│  ├─ roots.ts            # tìm kiếm gốc từ, nhận diện gốc từ của thẻ
 │  ├─ speech.ts           # phát âm (speechSynthesis)
 │  └─ storage.ts          # đọc/ghi localStorage
 └─ components/
    ├─ Flashcard.tsx       # thẻ lật, highlight từ mục tiêu
+   ├─ RootsPage.tsx       # tab Gốc từ & Ghép từ (tìm kiếm, thẻ gốc từ)
    └─ AddCard.tsx         # form thêm thẻ và danh sách thẻ tự tạo
 ```
 
@@ -81,6 +87,40 @@ Thêm một object vào `src/data/cards.json`:
 - `target` phải xuất hiện nguyên văn trong `sentence` thì mới được tô sáng.
 - `ipa`, `pos`, `example` là tùy chọn.
 
+## Tab “Gốc từ & Ghép từ”
+
+- **Tìm kiếm**: gõ gốc từ (`spect`, `port`, `bio`), tiền tố/hậu tố (`anti-`, `-tion`), nghĩa Tiếng Việt (`nhìn`, `viết`, có hoặc không dấu), hoặc một từ bất kỳ (`inspect` hiện cấu tạo; `inspection` được tách ra chứa `spect`). Nhấn `/` để nhảy nhanh tới ô tìm kiếm.
+- **Bộ lọc** Tất cả / EN / FR dùng chung với tab Flashcard.
+- Mỗi mục gồm: gốc/tiền tố/hậu tố, nguồn gốc và nghĩa cốt lõi, công thức ghép từ (có bản EN và FR đối chiếu), 3–5 từ phái sinh mỗi ngôn ngữ kèm nút nghe.
+- **Liên kết từ Flashcard**: nếu từ mục tiêu của thẻ có trong kho gốc từ, thẻ hiện nút “🌱 Xem gốc từ”. Với hậu tố, thẻ nhận diện thêm các từ dài kết thúc bằng hậu tố đó (vd `lentement` → `-ment`). Gốc từ thường không được nhận diện theo đoạn chữ để tránh gán nhầm (vd `airport` không phải gốc `port`).
+
+### Thêm dữ liệu gốc từ
+
+Thêm một object vào `src/data/wordRoots.json`:
+
+```json
+{
+  "id": "vis", "kind": "root", "langs": ["en", "fr"],
+  "form": { "en": "-vis- / -vid-", "fr": "-vis- / -voir" },
+  "origin": "Gốc Latin “videre”", "meaning": "thấy, nhìn",
+  "note": "Ghi chú tùy chọn.",
+  "frag": ["vis", "vid"],
+  "formula": {
+    "en": { "parts": [["re-", "lại"], ["view", "xem"]], "result": "review", "meaning": "xem lại" },
+    "fr": { "parts": [["re-", "lại"], ["voir", "thấy"]], "result": "revoir", "meaning": "xem lại" }
+  },
+  "words": {
+    "en": [["visible", "vis + -ible", "nhìn thấy được"]],
+    "fr": [["visible", "vis + -ible", "nhìn thấy được"]]
+  }
+}
+```
+
+- `kind`: `root` (gốc từ), `prefix` (tiền tố) hoặc `suffix` (hậu tố).
+- `langs`: mục chỉ có một ngôn ngữ thì ghi một phần tử (vd `["en"]`) và chỉ khai báo `formula`, `words` cho ngôn ngữ đó.
+- `frag`: các đoạn không dấu, chữ thường, dùng để nhận diện từ bất kỳ khi tra cứu. Để `[]` nếu đoạn quá ngắn hoặc dễ khớp nhầm.
+- Mỗi từ phái sinh là bộ ba `[từ, cấu tạo, nghĩa Việt]`. Mỗi phần của công thức là cặp `[phần, nghĩa Việt]`.
+
 ## Lịch ôn tập (SRS)
 
 Mỗi thẻ lưu số lần ôn, mức nhớ gần nhất, khoảng cách ôn (ngày) và thời điểm ôn tiếp theo.
@@ -101,6 +141,7 @@ Thẻ đến hạn xuất hiện trước, thẻ mới sau. Khi hết thẻ đ�
 | 1 / 2 / 3 | Đánh giá Khó / Tạm / Dễ |
 | → | Bỏ qua thẻ |
 | P | Nghe phát âm (câu ở mặt trước, từ ở mặt sau) |
+| / | (Tab Gốc từ) Nhảy tới ô tìm kiếm |
 
 ## Dữ liệu lưu trong trình duyệt
 
